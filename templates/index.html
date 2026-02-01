@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZcashPulse - Network Telemetry</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #161b22;
+            border-radius: 10px;
+            border: 1px solid #30363d;
+        }
+        h1 {
+            color: #f0b90b;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #f0b90b;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .description {
+            color: #8b949e;
+            font-size: 14px;
+            margin-bottom: 12px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .header-links {
+            color: #8b949e;
+            font-size: 14px;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        .header-links a {
+            color: #58a6ff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .header-links a:hover {
+            text-decoration: underline;
+        }
+        .maintainer {
+            color: #6e7681;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .metric-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        .metric-label {
+            color: #8b949e;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+        .metric-value.height {
+            color: #f0b90b;
+        }
+        .chart-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-title {
+            color: #c9d1d9;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 250px;
+        }
+        .last-updated {
+            text-align: center;
+            color: #8b949e;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3fb950;
+            margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .section-title {
+            color: #f0b90b;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #30363d;
+            font-size: 20px;
+        }
+        .peers-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .peers-table th, .peers-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #30363d;
+        }
+        .peers-table th {
+            background: #21262d;
+            color: #8b949e;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .peers-table tr:hover {
+            background: #21262d;
+        }
+        .peers-table td {
+            font-size: 13px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+        }
+        .user-agent {
+            color: #7ee787;
+        }
+        .message-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .message-stat-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 15px;
+        }
+        .message-stat-card h4 {
+            color: #8b949e;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .message-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .message-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #21262d;
+            font-size: 13px;
+        }
+        .message-item:last-child {
+            border-bottom: none;
+        }
+        .message-name {
+            color: #c9d1d9;
+        }
+        .message-count {
+            color: #58a6ff;
+            font-weight: 600;
+        }
+        .version-bar {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        .version-label {
+            min-width: 180px;
+            font-size: 12px;
+            color: #7ee787;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        .version-bar-bg {
+            flex: 1;
+            height: 20px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .version-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #238636, #2ea043);
+            border-radius: 4px;
+        }
+        .version-count {
+            min-width: 50px;
+            text-align: right;
+            font-size: 12px;
+            color: #8b949e;
+            margin-left: 10px;
+        }
+        /* Mobile Responsive Styles */
+        @media (max-width: 992px) {
+            .propagation-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            header {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            .subtitle {
+                font-size: 11px;
+            }
+            .description {
+                font-size: 13px;
+            }
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            .metric-card {
+                padding: 15px 10px;
+            }
+            .metric-value {
+                font-size: 24px;
+            }
+            .metric-label {
+                font-size: 12px;
+            }
+            .message-stats {
+                grid-template-columns: 1fr;
+            }
+            .propagation-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            .propagation-card {
+                padding: 15px;
+            }
+            .propagation-card h4 {
+                font-size: 13px;
+            }
+            .param-row {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .param-label {
+                font-size: 12px;
+                flex: 1 1 100%;
+            }
+            .param-value {
+                font-size: 13px;
+            }
+            .section-title {
+                font-size: 18px;
+                margin: 20px 0 15px 0;
+            }
+            .chart-container {
+                padding: 15px;
+            }
+            .chart-title {
+                font-size: 14px;
+            }
+            .chart-wrapper {
+                height: 200px;
+            }
+            .model-result {
+                padding: 12px;
+            }
+            .result-row {
+                flex-direction: column;
+                gap: 4px;
+                padding: 10px 0;
+            }
+            .result-label {
+                font-size: 12px;
+            }
+            .result-value {
+                font-size: 16px;
+            }
+            .formula {
+                font-size: 10px;
+                padding: 6px;
+            }
+            .peers-table th, .peers-table td {
+                padding: 8px 6px;
+                font-size: 11px;
+            }
+            .version-label {
+                min-width: 120px;
+                font-size: 10px;
+            }
+            .version-bar-bg {
+                height: 16px;
+            }
+        }
+        @media (max-width: 480px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            .param-row {
+                padding: 8px 0;
+                border-bottom: 1px solid #21262d;
+            }
+            .param-row:last-child {
+                border-bottom: none;
+            }
+        }
+        /* Propagation Model Styles */
+        .propagation-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .propagation-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .propagation-card h4 {
+            color: #f0b90b;
+            font-size: 14px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #30363d;
+        }
+        .param-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+        .param-label {
+            color: #8b949e;
+        }
+        .param-value {
+            color: #58a6ff;
+            font-weight: 600;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        .param-value.highlight {
+            color: #3fb950;
+            font-size: 16px;
+        }
+        .param-value.warning {
+            color: #f0b90b;
+        }
+        .model-result {
+            background: #21262d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .model-result h5 {
+            color: #c9d1d9;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #30363d;
+        }
+        .result-row:last-child {
+            border-bottom: none;
+        }
+        .result-label {
+            color: #8b949e;
+            font-size: 14px;
+        }
+        .result-value {
+            color: #3fb950;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        .formula {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 11px;
+            color: #6e7681;
+            background: #0d1117;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #8b949e;
+            font-size: 12px;
+        }
+        footer a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ZcashPulse</h1>
+            <p class="subtitle">Manhattan Project Network Telemetry</p>
+            <p class="description">Real-time metrics and block propagation analysis from our Zebra full node on mainnet.</p>
+            <p class="header-links">
+                Explore more: <a href="https://zechub.wiki/dashboard" target="_blank">ZecHub Dashboard</a> |
+                <a href="https://zecminers.xyz" target="_blank">ZecMiners</a>
+            </p>
+        </header>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Block Height</div>
+                <div class="metric-value height" id="block-height">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Peer Count</div>
+                <div class="metric-value" id="peer-count">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Stale Rate</div>
+                <div class="metric-value" id="stale-rate">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Active Forks</div>
+                <div class="metric-value" id="active-forks">--</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Block Height (Last Hour)</h3>
+            <div class="chart-wrapper">
+                <canvas id="height-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Blocks Committed (per 5min, Last Hour)</h3>
+            <div class="chart-wrapper">
+                <canvas id="blocks-committed-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Proofs Verified (per 5min, Last Hour)</h3>
+            <div class="chart-wrapper">
+                <canvas id="proofs-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Reorgs (Last 7 Days)</h3>
+            <div class="chart-wrapper">
+                <canvas id="reorgs-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Orchard Verification Section -->
+        <h2 class="section-title">Orchard Bundle Verification</h2>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Halo2 Last Batch</div>
+                <div class="metric-value" id="halo2-last-duration">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Halo2 Mean Batch</div>
+                <div class="metric-value" id="halo2-mean-duration">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Orchard Nullifiers</div>
+                <div class="metric-value" id="orchard-nullifiers">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Bundles (Valid / Invalid)</div>
+                <div class="metric-value" id="halo2-counts">--</div>
+            </div>
+        </div>
+
+        <div class="propagation-grid">
+            <div class="propagation-card">
+                <h4>Batch Breakdown</h4>
+                <div class="param-row">
+                    <span class="param-label">Total Batches</span>
+                    <span class="param-value" id="orchard-batch-count">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Bundles per Batch</span>
+                    <span class="param-value" id="orchard-bundles-per-batch">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Actions per Batch</span>
+                    <span class="param-value" id="orchard-actions-per-batch">--</span>
+                </div>
+            </div>
+            <div class="propagation-card">
+                <h4>Per-Transaction</h4>
+                <div class="param-row">
+                    <span class="param-label">Actions per Bundle</span>
+                    <span class="param-value" id="orchard-actions-per-bundle">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Amortized per Bundle</span>
+                    <span class="param-value highlight" id="orchard-per-bundle-ms">--</span>
+                </div>
+            </div>
+            <div class="propagation-card">
+                <h4>Per-Action</h4>
+                <div class="param-row">
+                    <span class="param-label">Total Actions (Nullifiers)</span>
+                    <span class="param-value" id="orchard-total-actions">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Amortized per Action</span>
+                    <span class="param-value highlight" id="orchard-per-action-ms">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Orchard Halo2 Verification Duration (mean ms, Last Hour)</h3>
+            <div class="chart-wrapper">
+                <canvas id="orchard-duration-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Orchard Activity (per 5min, Last Hour)</h3>
+            <div class="chart-wrapper">
+                <canvas id="orchard-activity-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Block Propagation Model Section -->
+        <h2 class="section-title">Block Propagation Model</h2>
+
+        <div class="propagation-grid">
+            <div class="propagation-card">
+                <h4>Network Structure</h4>
+                <div class="param-row">
+                    <span class="param-label">Peer Count (N)</span>
+                    <span class="param-value" id="prop-N">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Avg Degree (deg)</span>
+                    <span class="param-value" id="prop-deg">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Expected Hops</span>
+                    <span class="param-value" id="prop-hops">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Hop Weights (1/2/3 hops)</span>
+                    <span class="param-value" id="prop-weights">--</span>
+                </div>
+            </div>
+
+            <div class="propagation-card">
+                <h4>Link Latency (RTT-based)</h4>
+                <div class="param-row">
+                    <span class="param-label">Samples</span>
+                    <span class="param-value" id="rtt-samples">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">RTT Mean</span>
+                    <span class="param-value" id="rtt-mean">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">RTT Median / 90th Percentile</span>
+                    <span class="param-value" id="rtt-percentiles">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">RTT Min / Max</span>
+                    <span class="param-value" id="rtt-range">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Adjusted One-Way Latency</span>
+                    <span class="param-value highlight" id="mu-lambda">--</span>
+                </div>
+            </div>
+
+            <div class="propagation-card">
+                <h4>Block Processing Delay</h4>
+                <div class="param-row">
+                    <span class="param-label">Blocks Sampled</span>
+                    <span class="param-value" id="proc-samples">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Download Time (mean)</span>
+                    <span class="param-value" id="download-mean">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Verify Time (mean)</span>
+                    <span class="param-value" id="verify-mean">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Total Processing (median)</span>
+                    <span class="param-value" id="proc-p50">--</span>
+                </div>
+                <div class="param-row">
+                    <span class="param-label">Mean Processing Delay</span>
+                    <span class="param-value highlight" id="mu-d">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Theoretical Propagation Estimates</h3>
+            <div class="model-result">
+                <h5>Model Parameters</h5>
+                <div class="result-row">
+                    <span class="result-label">Per-Hop Delay (latency + processing)</span>
+                    <span class="result-value" id="mu-X">--</span>
+                </div>
+            </div>
+            <div class="model-result" style="margin-top: 10px;">
+                <h5>Propagation Time Estimates</h5>
+                <div class="result-row">
+                    <span class="result-label">Median Propagation (T50)</span>
+                    <span class="result-value" id="T50">--</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">90th Percentile (T90)</span>
+                    <span class="result-value" id="T90">--</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Expected Propagation Time</span>
+                    <span class="result-value" id="E-delta">--</span>
+                </div>
+            </div>
+            <div class="formula">
+                Model: Per-hop delay = link latency + processing delay
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">RTT & Processing Delay (Last Hour)</h3>
+            <div class="chart-wrapper">
+                <canvas id="propagation-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Peer Communications Section -->
+        <h2 class="section-title">Peer Communications</h2>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Message Rate (per minute, Last Hour)</h3>
+            <div class="chart-wrapper">
+                <canvas id="message-rate-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="message-stats">
+            <div class="message-stat-card">
+                <h4>Inbound Requests (from peers)</h4>
+                <div class="message-list" id="inbound-requests">
+                    <div class="message-item"><span class="message-name">Loading...</span></div>
+                </div>
+            </div>
+            <div class="message-stat-card">
+                <h4>Outbound Requests (to peers)</h4>
+                <div class="message-list" id="outbound-requests">
+                    <div class="message-item"><span class="message-name">Loading...</span></div>
+                </div>
+            </div>
+            <div class="message-stat-card">
+                <h4>Responses Received</h4>
+                <div class="message-list" id="responses">
+                    <div class="message-item"><span class="message-name">Loading...</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Peer Software Distribution</h3>
+            <div id="version-distribution">
+                <div class="version-bar">
+                    <span class="version-label">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Connected Peers</h3>
+            <div style="overflow-x: auto;">
+                <table class="peers-table">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Protocol Version</th>
+                            <th>User Agent</th>
+                            <th>Connections</th>
+                        </tr>
+                    </thead>
+                    <tbody id="peers-table-body">
+                        <tr><td colspan="4">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="last-updated">
+            <span class="status-dot"></span>
+            Last updated: <span id="last-updated">--</span>
+        </div>
+
+        <footer>
+            Powered by <a href="https://zfnd.org/zebra/" target="_blank">Zebra</a> |
+            Data from Prometheus
+            <br>
+            Maintained by: Mohak <a href="https://x.com/spartablock" target="_blank">@spartablock</a>
+            <br><br>
+            <span style="color: #6e7681; font-size: 11px;">
+                zebrad 3.1.0 · Intel Xeon E5-2686 v4 @ 2.30GHz · 2 vCPUs · 8 GB RAM · 387 GB disk · Ubuntu 24.04.3 LTS
+            </span>
+        </footer>
+    </div>
+
+    <script>
+        // Chart.js default styling for dark theme
+        Chart.defaults.color = '#8b949e';
+        Chart.defaults.borderColor = '#30363d';
+
+        // Initialize charts
+        let heightChart, blocksCommittedChart, proofsChart, reorgsChart, messageRateChart, propagationChart, orchardDurationChart, orchardActivityChart;
+
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            displayFormats: { minute: 'HH:mm' }
+                        },
+                        grid: { color: '#21262d' }
+                    },
+                    y: {
+                        grid: { color: '#21262d' }
+                    }
+                }
+            };
+
+            const chartOptionsWithLegend = {
+                ...chartOptions,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: '#8b949e' }
+                    }
+                }
+            };
+
+            heightChart = new Chart(document.getElementById('height-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: [],
+                        borderColor: '#f0b90b',
+                        backgroundColor: 'rgba(240, 185, 11, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0
+                    }]
+                },
+                options: chartOptions
+            });
+
+            blocksCommittedChart = new Chart(document.getElementById('blocks-committed-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: [],
+                        borderColor: '#3fb950',
+                        backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0
+                    }]
+                },
+                options: chartOptions
+            });
+
+            proofsChart = new Chart(document.getElementById('proofs-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Groth16 (Sapling)',
+                            data: [],
+                            borderColor: '#f78166',
+                            backgroundColor: 'rgba(247, 129, 102, 0.1)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Halo2 (Orchard)',
+                            data: [],
+                            borderColor: '#a371f7',
+                            backgroundColor: 'rgba(163, 113, 247, 0.1)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: chartOptionsWithLegend
+            });
+
+            const reorgsChartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'day',
+                            displayFormats: { day: 'MMM d' }
+                        },
+                        grid: { color: '#21262d' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#21262d' }
+                    }
+                }
+            };
+
+            reorgsChart = new Chart(document.getElementById('reorgs-chart'), {
+                type: 'bar',
+                data: {
+                    datasets: [{
+                        data: [],
+                        backgroundColor: 'rgba(248, 81, 73, 0.8)',
+                        borderColor: '#f85149',
+                        borderWidth: 1
+                    }]
+                },
+                options: reorgsChartOptions
+            });
+
+            // Message rate chart
+            messageRateChart = new Chart(document.getElementById('message-rate-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Inbound Requests',
+                            data: [],
+                            borderColor: '#3fb950',
+                            backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Outbound Requests',
+                            data: [],
+                            borderColor: '#58a6ff',
+                            backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Responses',
+                            data: [],
+                            borderColor: '#f0b90b',
+                            backgroundColor: 'rgba(240, 185, 11, 0.1)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: chartOptionsWithLegend
+            });
+
+            // Orchard duration chart
+            orchardDurationChart = new Chart(document.getElementById('orchard-duration-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: [],
+                        borderColor: '#a371f7',
+                        backgroundColor: 'rgba(163, 113, 247, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            grid: { color: '#21262d' },
+                            title: { display: true, text: 'ms' }
+                        }
+                    }
+                }
+            });
+
+            // Orchard activity chart
+            orchardActivityChart = new Chart(document.getElementById('orchard-activity-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Halo2 Proofs Verified',
+                            data: [],
+                            borderColor: '#a371f7',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Orchard Nullifiers',
+                            data: [],
+                            borderColor: '#f78166',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: chartOptionsWithLegend
+            });
+
+            // Propagation metrics chart
+            propagationChart = new Chart(document.getElementById('propagation-chart'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'RTT p50 (ms)',
+                            data: [],
+                            borderColor: '#58a6ff',
+                            backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Processing Delay p50 (ms)',
+                            data: [],
+                            borderColor: '#3fb950',
+                            backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    ...chartOptionsWithLegend,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'minute',
+                                displayFormats: { minute: 'HH:mm' }
+                            },
+                            grid: { color: '#21262d' }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: '#21262d' },
+                            title: {
+                                display: true,
+                                text: 'Milliseconds'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('/api/metrics');
+                const data = await response.json();
+
+                document.getElementById('block-height').textContent =
+                    data.block_height ? data.block_height.toLocaleString() : '--';
+                document.getElementById('peer-count').textContent =
+                    data.peer_count ?? '--';
+                document.getElementById('stale-rate').textContent =
+                    data.stale_rate !== null ? data.stale_rate + '%' : '--';
+                document.getElementById('active-forks').textContent =
+                    data.active_forks ?? '--';
+                document.getElementById('last-updated').textContent =
+                    new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+            }
+        }
+
+        async function fetchChartData() {
+            try {
+                const [heightRes, blocksCommittedRes, proofsRes, reorgsRes] = await Promise.all([
+                    fetch('/api/block-height-history'),
+                    fetch('/api/blocks-committed-history'),
+                    fetch('/api/proofs-verified-history'),
+                    fetch('/api/reorgs-history')
+                ]);
+
+                const heightData = await heightRes.json();
+                const blocksCommittedData = await blocksCommittedRes.json();
+                const proofsData = await proofsRes.json();
+                const reorgsData = await reorgsRes.json();
+
+                heightChart.data.datasets[0].data = heightData;
+                heightChart.update('none');
+
+                blocksCommittedChart.data.datasets[0].data = blocksCommittedData;
+                blocksCommittedChart.update('none');
+
+                proofsChart.data.datasets[0].data = proofsData.groth16;
+                proofsChart.data.datasets[1].data = proofsData.halo2;
+                proofsChart.update('none');
+
+                reorgsChart.data.datasets[0].data = reorgsData;
+                reorgsChart.update('none');
+            } catch (error) {
+                console.error('Error fetching chart data:', error);
+            }
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        function renderMessageList(containerId, data) {
+            const container = document.getElementById(containerId);
+            if (!data || Object.keys(data).length === 0) {
+                container.innerHTML = '<div class="message-item"><span class="message-name">No data</span></div>';
+                return;
+            }
+
+            // Sort by count descending
+            const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+
+            container.innerHTML = sorted.map(([name, count]) => `
+                <div class="message-item">
+                    <span class="message-name">${name}</span>
+                    <span class="message-count">${formatNumber(count)}</span>
+                </div>
+            `).join('');
+        }
+
+        async function fetchPeerMessages() {
+            try {
+                const response = await fetch('/api/peer-messages');
+                const data = await response.json();
+
+                renderMessageList('inbound-requests', data.inbound_requests);
+                renderMessageList('outbound-requests', data.outbound_requests);
+                renderMessageList('responses', data.responses);
+            } catch (error) {
+                console.error('Error fetching peer messages:', error);
+            }
+        }
+
+        async function fetchConnectedPeers() {
+            try {
+                const response = await fetch('/api/connected-peers');
+                const peers = await response.json();
+
+                const tbody = document.getElementById('peers-table-body');
+                if (!peers || peers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4">No connected peers</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = peers.slice(0, 25).map(peer => `
+                    <tr>
+                        <td>${peer.ip}</td>
+                        <td>${peer.negotiated_version}</td>
+                        <td class="user-agent">${peer.user_agent}</td>
+                        <td>${peer.connections}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching connected peers:', error);
+            }
+        }
+
+        async function fetchPeerVersions() {
+            try {
+                const response = await fetch('/api/peer-versions');
+                const versions = await response.json();
+
+                const container = document.getElementById('version-distribution');
+                if (!versions || versions.length === 0) {
+                    container.innerHTML = '<div class="version-bar"><span class="version-label">No data</span></div>';
+                    return;
+                }
+
+                const maxCount = Math.max(...versions.map(v => v.count));
+
+                container.innerHTML = versions.slice(0, 10).map(v => {
+                    const percentage = (v.count / maxCount) * 100;
+                    return `
+                        <div class="version-bar">
+                            <span class="version-label">${v.user_agent}</span>
+                            <div class="version-bar-bg">
+                                <div class="version-bar-fill" style="width: ${percentage}%"></div>
+                            </div>
+                            <span class="version-count">${v.count}</span>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error fetching peer versions:', error);
+            }
+        }
+
+        async function fetchMessageRates() {
+            try {
+                const response = await fetch('/api/message-rates');
+                const data = await response.json();
+
+                messageRateChart.data.datasets[0].data = data.inbound;
+                messageRateChart.data.datasets[1].data = data.outbound;
+                messageRateChart.data.datasets[2].data = data.responses;
+                messageRateChart.update('none');
+            } catch (error) {
+                console.error('Error fetching message rates:', error);
+            }
+        }
+
+        async function fetchPeerData() {
+            await Promise.all([
+                fetchPeerMessages(),
+                fetchConnectedPeers(),
+                fetchPeerVersions(),
+                fetchMessageRates()
+            ]);
+        }
+
+        async function fetchOrchardMetrics() {
+            try {
+                const response = await fetch('/api/orchard-metrics');
+                const data = await response.json();
+
+                document.getElementById('halo2-last-duration').textContent =
+                    data.halo2_proof_verification?.last_duration_ms != null
+                        ? data.halo2_proof_verification.last_duration_ms + ' ms' : '--';
+                document.getElementById('halo2-mean-duration').textContent =
+                    data.halo2_proof_verification?.mean_duration_ms != null
+                        ? data.halo2_proof_verification.mean_duration_ms + ' ms' : '--';
+                document.getElementById('orchard-nullifiers').textContent =
+                    data.orchard_nullifiers != null
+                        ? data.orchard_nullifiers.toLocaleString() : '--';
+                document.getElementById('halo2-counts').textContent =
+                    data.halo2_proof_verification
+                        ? `${formatNumber(data.halo2_proof_verification.verified)} / ${formatNumber(data.halo2_proof_verification.invalid)}`
+                        : '--';
+
+                // Batch breakdown
+                document.getElementById('orchard-batch-count').textContent =
+                    data.halo2_proof_verification?.batch_count != null
+                        ? formatNumber(data.halo2_proof_verification.batch_count) : '--';
+                document.getElementById('orchard-bundles-per-batch').textContent =
+                    data.derived?.bundles_per_batch != null
+                        ? data.derived.bundles_per_batch : '--';
+                document.getElementById('orchard-actions-per-batch').textContent =
+                    data.derived?.actions_per_batch != null
+                        ? data.derived.actions_per_batch : '--';
+
+                // Per-transaction
+                document.getElementById('orchard-actions-per-bundle').textContent =
+                    data.derived?.actions_per_bundle != null
+                        ? data.derived.actions_per_bundle : '--';
+                document.getElementById('orchard-per-bundle-ms').textContent =
+                    data.derived?.per_bundle_ms != null
+                        ? data.derived.per_bundle_ms + ' ms' : '--';
+
+                // Per-action
+                document.getElementById('orchard-total-actions').textContent =
+                    data.orchard_nullifiers != null
+                        ? data.orchard_nullifiers.toLocaleString() : '--';
+                document.getElementById('orchard-per-action-ms').textContent =
+                    data.derived?.per_action_ms != null
+                        ? data.derived.per_action_ms + ' ms' : '--';
+            } catch (error) {
+                console.error('Error fetching orchard metrics:', error);
+            }
+        }
+
+        async function fetchOrchardHistory() {
+            try {
+                const response = await fetch('/api/orchard-history');
+                const data = await response.json();
+
+                orchardDurationChart.data.datasets[0].data = data.halo2_duration;
+                orchardDurationChart.update('none');
+
+                orchardActivityChart.data.datasets[0].data = data.halo2_rate;
+                orchardActivityChart.data.datasets[1].data = data.orchard_nullifiers_rate;
+                orchardActivityChart.update('none');
+            } catch (error) {
+                console.error('Error fetching orchard history:', error);
+            }
+        }
+
+        async function fetchAllOrchardData() {
+            await Promise.all([
+                fetchOrchardMetrics(),
+                fetchOrchardHistory()
+            ]);
+        }
+
+        async function fetchPropagationMetrics() {
+            try {
+                const response = await fetch('/api/propagation-metrics');
+                const data = await response.json();
+
+                // Network structure
+                document.getElementById('prop-N').textContent = data.network?.N ?? '--';
+                document.getElementById('prop-deg').textContent = data.network?.deg ?? '--';
+                document.getElementById('prop-hops').textContent = data.network?.expected_hops ?? '--';
+                if (data.network?.hop_weights) {
+                    const w = data.network.hop_weights;
+                    document.getElementById('prop-weights').textContent =
+                        `${(w.h1 * 100).toFixed(1)}% / ${(w.h2 * 100).toFixed(1)}% / ${(w.h3 * 100).toFixed(1)}%`;
+                }
+
+                // RTT / Link latency
+                document.getElementById('rtt-samples').textContent = data.rtt?.samples ?? '--';
+                document.getElementById('rtt-mean').textContent = data.rtt?.mean_ms ? `${data.rtt.mean_ms} ms` : '--';
+                document.getElementById('rtt-percentiles').textContent =
+                    data.rtt?.p50_ms && data.rtt?.p90_ms ? `${data.rtt.p50_ms} / ${data.rtt.p90_ms} ms` : '--';
+                document.getElementById('rtt-range').textContent =
+                    data.rtt?.min_ms && data.rtt?.max_ms ? `${data.rtt.min_ms} / ${data.rtt.max_ms} ms` : '--';
+                document.getElementById('mu-lambda').textContent =
+                    data.model_params?.mu_lambda_ms ? `${data.model_params.mu_lambda_ms} ms` : '--';
+
+                // Block processing
+                document.getElementById('proc-samples').textContent = data.processing?.samples ?? '--';
+                document.getElementById('download-mean').textContent =
+                    data.download?.mean_ms ? `${data.download.mean_ms} ms` : '--';
+                document.getElementById('verify-mean').textContent =
+                    data.verify?.mean_ms ? `${data.verify.mean_ms} ms` : '--';
+                document.getElementById('proc-p50').textContent =
+                    data.processing?.p50_ms ? `${data.processing.p50_ms} ms` : '--';
+                document.getElementById('mu-d').textContent =
+                    data.model_params?.mu_d_ms ? `${data.model_params.mu_d_ms} ms` : '--';
+
+                // Model parameters
+                document.getElementById('mu-X').textContent =
+                    data.model_params?.mu_X_ms ? `${data.model_params.mu_X_ms} ms` : '--';
+
+                // Propagation estimates
+                document.getElementById('T50').textContent =
+                    data.propagation?.T50_ms ? `${data.propagation.T50_ms} ms` : '--';
+                document.getElementById('T90').textContent =
+                    data.propagation?.T90_ms ? `${data.propagation.T90_ms} ms` : '--';
+                document.getElementById('E-delta').textContent =
+                    data.propagation?.expected_ms ? `${data.propagation.expected_ms} ms` : '--';
+
+            } catch (error) {
+                console.error('Error fetching propagation metrics:', error);
+            }
+        }
+
+        async function fetchPropagationHistory() {
+            try {
+                const response = await fetch('/api/propagation-history');
+                const data = await response.json();
+
+                propagationChart.data.datasets[0].data = data.rtt;
+                propagationChart.data.datasets[1].data = data.processing;
+                propagationChart.update('none');
+            } catch (error) {
+                console.error('Error fetching propagation history:', error);
+            }
+        }
+
+        async function fetchAllPropagationData() {
+            await Promise.all([
+                fetchPropagationMetrics(),
+                fetchPropagationHistory()
+            ]);
+        }
+
+        // Initialize
+        initCharts();
+        fetchMetrics();
+        fetchChartData();
+        fetchPeerData();
+        fetchAllPropagationData();
+        fetchAllOrchardData();
+
+        // Refresh every 10 seconds for metrics, 60 seconds for charts, 30 seconds for peer and propagation data
+        setInterval(fetchMetrics, 10000);
+        setInterval(fetchChartData, 60000);
+        setInterval(fetchPeerData, 30000);
+        setInterval(fetchAllPropagationData, 30000);
+        setInterval(fetchAllOrchardData, 30000);
+    </script>
+</body>
+</html>
